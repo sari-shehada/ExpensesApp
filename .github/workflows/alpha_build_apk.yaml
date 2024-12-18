@@ -1,0 +1,88 @@
+name: Notify Telegram on Alpha Build
+
+on:
+  push:
+    branches:
+      - alpha
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get GitHub display name
+        id: get_display_name
+        run: echo "DISPLAY_NAME=$(curl -s https://api.github.com/users/${GITHUB_ACTOR} | jq -r .name)" >> $GITHUB_ENV
+
+      - name: Send Telegram Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.CHAT_ID }}
+          token: ${{ secrets.BOT_TOKEN }}
+          message: |
+            🔥 New Alpha Build Alert!
+
+            A new build has been launched on Alpha channel
+
+            Repository: Expenses App
+            Initiated By: ${{ env.DISPLAY_NAME }}
+            Last Commit message: ${{ github.event.head_commit.message }}
+
+            🛠️ Now Building an apk file
+
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: 3.27.1
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Set APK file name
+        id: set_apk_name
+        run: |
+          VERSION=$(grep 'version:' pubspec.yaml | sed 's/version: //')
+          APK_NAME="ExpensesApp-$VERSION.apk"
+          echo "APK_NAME=$APK_NAME" >> $GITHUB_ENV
+
+      - name: Rename APK
+        run: mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/${{ env.APK_NAME }}
+
+      - name: Send APK to Telegram
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.CHAT_ID }}
+          token: ${{ secrets.BOT_TOKEN }}
+          document: build/app/outputs/flutter-apk/${{ env.APK_NAME }}
+          message: |
+            ✅ New APK build success
+            Branch: ${{ github.ref }}
+            By: ${{ env.DISPLAY_NAME }}
+
+      - name: Send failure notification to Telegram
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.CHAT_ID }}
+          token: ${{ secrets.BOT_TOKEN }}
+          document: build/app/outputs/flutter-apk/${{ env.APK_NAME }}
+          message: |
+            🚨 Build failed!
+            Branch: ${{ github.ref }}
+            Last Commit by: ${{ env.DISPLAY_NAME }} (Kindly consider quitting this career..) 🙏🏻
+            Commit message: ${{ github.event.head_commit.message }}
+            Job: ${{ github.job }}

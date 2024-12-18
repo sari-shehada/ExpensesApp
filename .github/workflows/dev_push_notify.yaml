@@ -1,0 +1,31 @@
+name: Notify Telegram on Dev Push
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get GitHub display name
+        id: get_display_name
+        run: echo "DISPLAY_NAME=$(curl -s https://api.github.com/users/${GITHUB_ACTOR} | jq -r .name)" >> $GITHUB_ENV
+
+      - name: Send Telegram Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.CHAT_ID }}
+          token: ${{ secrets.BOT_TOKEN }}
+          message: |
+            ⬆️ Push Alert!
+
+            Repository: Expenses App
+            Branch: ${{ github.ref }}
+            By: ${{ env.DISPLAY_NAME }}
+            Last Commit message: ${{ github.event.head_commit.message }}
+
+            Thank you for your contributions ${{ env.DISPLAY_NAME }}
+
+            For everyone else: Kindly pull the changes before pushing your own!
